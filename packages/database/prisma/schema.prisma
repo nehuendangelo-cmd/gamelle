@@ -1,0 +1,229 @@
+// Prisma schema for January - Plateforme de Partage de Plats Faits Maison
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER
+// ============================================================================
+
+model User {
+  id                          String    @id @default(cuid())
+  fortyTwoId                  String    @unique @map("forty_two_id")
+  email                       String    @unique
+  login                       String    @unique
+  displayName                 String    @map("display_name")
+  avatarUrl                   String?   @map("avatar_url")
+  bio                         String?
+  tokens                      Int       @default(100)
+  preferredCuisines           String[]  @default([]) @map("preferred_cuisines")
+  dietaryPreferences          String[]  @default([]) @map("dietary_preferences")
+  safetyOnboardingCompletedAt DateTime? @map("safety_onboarding_completed_at")
+  emailNotifications          Boolean   @default(true) @map("email_notifications")
+  campus                      String?
+  createdAt                   DateTime  @default(now()) @map("created_at")
+  updatedAt                   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  meals              Meal[]
+  reservationsAsBuyer Reservation[] @relation("ReserverRelation")
+  transactions       TokenTransaction[]
+  disputesReported   Dispute[]     @relation("DisputeReporter")
+  barterProposals    BarterProposal[] @relation("BarterProposer")
+
+  @@map("users")
+}
+
+// ============================================================================
+// MEAL
+// ============================================================================
+
+enum MealStatus {
+  available
+  reserved
+  completed
+  expired
+  cancelled
+}
+
+model Meal {
+  id                 String     @id @default(cuid())
+  title              String
+  description        String?
+  ingredients        String[]
+  allergens          String[]   @default([])
+  cuisineType        String     @map("cuisine_type")
+  status             MealStatus @default(available)
+  tokenCost          Int        @map("token_cost")
+  portionCount       Int        @default(1) @map("portion_count")
+  expirationDate     DateTime   @map("expiration_date")
+  pickupLocation     String     @map("pickup_location")
+  pickupInstructions String?    @map("pickup_instructions")
+  authorId           String     @map("author_id")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  author            User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  images            MealImage[]
+  reservations      Reservation[]
+  barterProposalsOffered   BarterProposal[] @relation("OfferedMeal")
+  barterProposalsRequested BarterProposal[] @relation("RequestedMeal")
+
+  @@index([status])
+  @@index([cuisineType])
+  @@index([expirationDate])
+  @@index([authorId])
+  @@map("meals")
+}
+
+model MealImage {
+  id           String @id @default(cuid())
+  mealId       String @map("meal_id")
+  imageUrl     String @map("image_url")
+  displayOrder Int    @default(0) @map("display_order")
+
+  // Relations
+  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@index([mealId])
+  @@map("meal_images")
+}
+
+// ============================================================================
+// RESERVATION
+// ============================================================================
+
+enum ReservationStatus {
+  pending
+  confirmed
+  pickup_confirmed
+  completed
+  cancelled
+  disputed
+}
+
+model Reservation {
+  id               String            @id @default(cuid())
+  mealId           String            @map("meal_id")
+  reserverId       String            @map("reserver_id")
+  tokensEscrowed   Int               @map("tokens_escrowed")
+  status           ReservationStatus @default(pending)
+  pickupPhotoUrl   String?           @map("pickup_photo_url")
+  pickupConfirmedAt DateTime?        @map("pickup_confirmed_at")
+  completedAt      DateTime?         @map("completed_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  meal        Meal               @relation(fields: [mealId], references: [id])
+  reserver    User               @relation("ReserverRelation", fields: [reserverId], references: [id])
+  disputes    Dispute[]
+  transactions TokenTransaction[]
+
+  @@index([mealId])
+  @@index([reserverId])
+  @@index([status])
+  @@map("reservations")
+}
+
+// ============================================================================
+// DISPUTE
+// ============================================================================
+
+enum DisputeStatus {
+  open
+  resolved
+  dismissed
+}
+
+model Dispute {
+  id            String        @id @default(cuid())
+  reservationId String        @map("reservation_id")
+  reporterId    String        @map("reporter_id")
+  reason        String
+  status        DisputeStatus @default(open)
+  resolution    String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+  reporter    User        @relation("DisputeReporter", fields: [reporterId], references: [id])
+
+  @@index([reservationId])
+  @@index([status])
+  @@map("disputes")
+}
+
+// ============================================================================
+// TOKEN TRANSACTION
+// ============================================================================
+
+enum TransactionType {
+  initial_grant
+  escrow_hold
+  escrow_release
+  escrow_refund
+  meal_payment
+  meal_earning
+}
+
+model TokenTransaction {
+  id                   String          @id @default(cuid())
+  userId               String          @map("user_id")
+  amount               Int
+  type                 TransactionType
+  relatedReservationId String?         @map("related_reservation_id")
+  description          String?
+  createdAt            DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  user        User         @relation(fields: [userId], references: [id])
+  reservation Reservation? @relation(fields: [relatedReservationId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@map("token_transactions")
+}
+
+// ============================================================================
+// BARTER PROPOSAL
+// ============================================================================
+
+enum BarterStatus {
+  pending
+  accepted
+  rejected
+  expired
+  cancelled
+}
+
+model BarterProposal {
+  id              String       @id @default(cuid())
+  offeredMealId   String       @map("offered_meal_id")
+  requestedMealId String       @map("requested_meal_id")
+  proposerId      String       @map("proposer_id")
+  status          BarterStatus @default(pending)
+  message         String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  offeredMeal   Meal @relation("OfferedMeal", fields: [offeredMealId], references: [id])
+  requestedMeal Meal @relation("RequestedMeal", fields: [requestedMealId], references: [id])
+  proposer      User @relation("BarterProposer", fields: [proposerId], references: [id])
+
+  @@index([offeredMealId])
+  @@index([requestedMealId])
+  @@index([proposerId])
+  @@index([status])
+  @@map("barter_proposals")
+}

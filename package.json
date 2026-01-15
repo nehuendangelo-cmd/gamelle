@@ -1,0 +1,38 @@
+{
+  "name": "january",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plateforme de Partage de Plats Faits Maison - École 42",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @january/database generate",
+    "db:push": "pnpm --filter @january/database push",
+    "db:migrate": "pnpm --filter @january/database migrate",
+    "db:studio": "pnpm --filter @january/database studio"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "turbo": "^1.12.0",
+    "typescript": "5.3.3"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
